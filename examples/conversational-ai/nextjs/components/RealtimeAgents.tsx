@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Mic, Settings, Square, MessageCircle, Zap, Brain } from 'lucide-react';
+import { Mic, Settings, Square, MessageCircle, Zap, Brain, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useConversation } from "@11labs/react";
@@ -36,23 +36,24 @@ interface Message {
 
 export function RealtimeAgents() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [currentAgent, setCurrentAgent] = useState('Chat Agent');
+  const [currentAgent, setCurrentAgent] = useState('AI Assistant');
   const [conversationLogs, setConversationLogs] = useState<string[]>([]);
+  const [isConnecting, setIsConnecting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const conversation = useConversation({
     onConnect: () => {
-      console.log("Connected to ElevenLabs");
-      addMessage('system', 'Connected to ElevenLabs Conversational AI');
-      addConversationLog('✅ Connected to ElevenLabs Conversational AI');
+      console.log("Connected to Voice AI");
+      addMessage('system', 'Connected to Voice AI');
+      addConversationLog('✅ Connected to Voice AI');
     },
     onDisconnect: () => {
-      console.log("Disconnected from ElevenLabs");
-      addMessage('system', 'Disconnected from ElevenLabs');
-      addConversationLog('❌ Disconnected from ElevenLabs');
+      console.log("Disconnected from Voice AI");
+      addMessage('system', 'Disconnected from Voice AI');
+      addConversationLog('❌ Disconnected from Voice AI');
       setMessages([]);
       setConversationLogs([]);
-      setCurrentAgent('Chat Agent');
+      setCurrentAgent('AI Assistant');
     },
     onError: error => {
       console.log("Error:", error);
@@ -64,7 +65,7 @@ export function RealtimeAgents() {
       console.log("Message received:", message);
       addConversationLog(`📨 Message: ${JSON.stringify(message)}`);
       
-      // Handle messages from ElevenLabs
+      // Handle messages from Voice AI
       if (message.source === 'user') {
         addMessage('user', message.message, 'You');
       } else if (message.source === 'ai') {
@@ -106,6 +107,7 @@ export function RealtimeAgents() {
     }
     
     try {
+      setIsConnecting(true);
       addConversationLog('🔄 Requesting signed URL...');
       const signedUrl = await getSignedUrl();
       addConversationLog('✅ Signed URL obtained');
@@ -117,6 +119,8 @@ export function RealtimeAgents() {
       console.error('Failed to start conversation:', error);
       addMessage('system', 'Failed to start conversation');
       addConversationLog(`❌ Failed to start conversation: ${error}`);
+    } finally {
+      setIsConnecting(false);
     }
   }, [conversation]);
 
@@ -135,98 +139,135 @@ export function RealtimeAgents() {
   const connectionStatus = isConnected ? 'Connected' : 'Disconnected';
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* Header */}
-      <header className="border-b border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+      <header className="border-b border-slate-200/60 bg-white/80 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
                 <Zap className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">ElevenLabs Conversational AI</h1>
-                <p className="text-sm text-gray-600">Real-time voice conversation with AI agents</p>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                  Mission Voice AI
+                </h1>
+                <p className="text-sm text-slate-600">Advanced conversational intelligence</p>
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span className="text-sm text-gray-700">{connectionStatus}</span>
+            <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-full border border-slate-200">
+              <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 shadow-emerald-500/50 shadow-sm' : 'bg-slate-400'}`} />
+              <span className="text-sm font-medium text-slate-700">{connectionStatus}</span>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Control Panel */}
-          <div className="lg:col-span-1 space-y-4">
-            <Card className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Brain className="w-4 h-4" />
-                <h3 className="font-semibold text-gray-900">Voice Assistant</h3>
+          <div className="lg:col-span-1 space-y-6">
+            <Card className="p-6 bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg shadow-slate-900/5">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                  <Brain className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="font-semibold text-slate-900">Voice Assistant</h3>
               </div>
               
-              <p className="text-sm text-gray-600 mb-6">
-                Connect to start a real-time voice conversation with ElevenLabs Conversational AI.
+              <p className="text-sm text-slate-600 mb-8 leading-relaxed">
+                Connect to start an intelligent voice conversation powered by advanced AI technology.
               </p>
               
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <Button
                   onClick={startConversation}
-                  disabled={isConnected}
-                  className={`w-full ${
-                    isConnected 
-                      ? 'bg-gray-300 cursor-not-allowed' 
-                      : 'bg-gray-900 hover:bg-gray-800'
+                  disabled={isConnected || isConnecting}
+                  className={`w-full h-12 rounded-xl font-medium transition-all duration-200 ${
+                    isConnected || isConnecting
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' 
+                      : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-[1.02]'
                   }`}
                 >
-                  {isConnected ? 'Connected' : 'Connect'}
+                  {isConnected ? (
+                    <span className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                      Connected
+                    </span>
+                  ) : isConnecting ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Connecting...
+                    </span>
+                  ) : (
+                    'Start Conversation'
+                  )}
                 </Button>
                 
                 <Button
                   onClick={stopConversation}
                   disabled={!isConnected}
-                  variant="destructive"
-                  className="w-full"
+                  variant="outline"
+                  className="w-full h-12 rounded-xl font-medium border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 disabled:opacity-40"
                 >
-                  Disconnect
+                  End Conversation
                 </Button>
               </div>
 
-              {/* Voice Activity Indicator */}
+              {/* Voice Activity Display */}
               {isConnected && (
-                <div className="mt-6 text-center">
-                  <div className={cn(
-                    "w-16 h-16 mx-auto rounded-full border-4 transition-all duration-300",
-                    conversation.isSpeaking
-                      ? "border-green-500 bg-green-100 animate-pulse"
-                      : "border-blue-500 bg-blue-100"
-                  )}>
-                    <div className="flex items-center justify-center h-full">
+                <div className="mt-8 p-6 bg-gradient-to-br from-slate-50 to-blue-50/50 rounded-2xl border border-slate-200/60">
+                  <div className="text-center">
+                    <div className={cn(
+                      "w-20 h-20 mx-auto rounded-full border-4 transition-all duration-500 flex items-center justify-center",
+                      conversation.isSpeaking
+                        ? "border-emerald-400 bg-emerald-50 shadow-lg shadow-emerald-500/20 animate-pulse"
+                        : "border-blue-400 bg-blue-50 shadow-lg shadow-blue-500/20"
+                    )}>
                       <Mic className={cn(
-                        "w-6 h-6",
-                        conversation.isSpeaking ? "text-green-600" : "text-blue-600"
+                        "w-8 h-8 transition-colors duration-300",
+                        conversation.isSpeaking ? "text-emerald-600" : "text-blue-600"
                       )} />
                     </div>
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-slate-700">
+                        {conversation.isSpeaking ? 'AI is speaking' : 'Listening...'}
+                      </p>
+                      <div className="flex justify-center mt-2">
+                        <div className="flex gap-1">
+                          {[...Array(3)].map((_, i) => (
+                            <div
+                              key={i}
+                              className={cn(
+                                "w-1 h-4 rounded-full transition-all duration-300",
+                                conversation.isSpeaking 
+                                  ? "bg-emerald-400 animate-bounce" 
+                                  : "bg-blue-400",
+                              )}
+                              style={{ animationDelay: `${i * 0.1}s` }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-600 mt-2">
-                    {conversation.isSpeaking ? 'Agent is speaking' : 'Listening...'}
-                  </p>
                 </div>
               )}
             </Card>
 
             {/* Connection Logs */}
-            <Card className="p-4">
-              <h4 className="font-medium text-gray-900 mb-3">Connection Logs</h4>
-              <div className="max-h-40 overflow-y-auto space-y-1">
+            <Card className="p-5 bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg shadow-slate-900/5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                <h4 className="font-medium text-slate-900">System Logs</h4>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-2">
                 {conversationLogs.length === 0 ? (
-                  <p className="text-xs text-gray-500">No logs yet</p>
+                  <p className="text-xs text-slate-500 italic">Waiting for connection...</p>
                 ) : (
                   conversationLogs.map((log, index) => (
-                    <div key={index} className="text-xs text-gray-600 font-mono">
+                    <div key={index} className="text-xs text-slate-600 font-mono bg-slate-50 rounded p-2 border border-slate-100">
                       {log}
                     </div>
                   ))
@@ -237,30 +278,42 @@ export function RealtimeAgents() {
 
           {/* Main Chat Interface */}
           <div className="lg:col-span-3">
-            <Card className="h-[600px] flex flex-col">
+            <Card className="h-[700px] flex flex-col bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-xl shadow-slate-900/5">
               {/* Chat Header */}
-              <div className="p-4 border-b border-gray-200">
+              <div className="p-6 border-b border-slate-200/60 bg-gradient-to-r from-slate-50/50 to-blue-50/30">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <div className={cn(
-                      "w-3 h-3 rounded-full",
-                      isConnected ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                      "w-4 h-4 rounded-full transition-all duration-300",
+                      isConnected ? "bg-emerald-500 shadow-emerald-500/50 shadow-sm animate-pulse" : "bg-slate-400"
                     )} />
-                    <span className="font-medium text-gray-900">
-                      Status: {isConnected ? 'Active Conversation' : 'Not Connected'}
-                    </span>
+                    <div>
+                      <span className="font-semibold text-slate-900">
+                        {isConnected ? 'Active Conversation' : 'Ready to Connect'}
+                      </span>
+                      <p className="text-sm text-slate-600 mt-0.5">
+                        {isConnected ? 'Speak naturally, I\'m listening' : 'Click "Start Conversation" to begin'}
+                      </p>
+                    </div>
                   </div>
-                  <Settings className="w-5 h-5 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                 </div>
               </div>
 
               {/* Messages */}
-              <CardContent className="flex-1 overflow-y-auto space-y-4 p-4">
+              <CardContent className="flex-1 overflow-y-auto space-y-6 p-6">
                 {messages.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <div className="text-center">
-                      <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>Connect to start voice conversation with AI</p>
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center max-w-md">
+                      <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-purple-500/25">
+                        <MessageCircle className="w-8 h-8 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                        Ready for Conversation
+                      </h3>
+                      <p className="text-slate-600 leading-relaxed">
+                        Start your voice conversation with our advanced AI assistant. 
+                        Simply click "Start Conversation" and begin speaking naturally.
+                      </p>
                     </div>
                   </div>
                 ) : (
@@ -269,21 +322,40 @@ export function RealtimeAgents() {
                       key={message.id}
                       className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div
-                        className={cn(
-                          "max-w-[80%] p-3 rounded-lg",
-                          message.type === 'user'
-                            ? 'bg-gray-900 text-white'
-                            : message.type === 'system'
-                            ? 'bg-blue-100 text-blue-800 text-center'
-                            : 'bg-gray-100 text-gray-900'
+                      <div className="flex items-start gap-3 max-w-[85%]">
+                        {message.type !== 'user' && (
+                          <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                            <Brain className="w-4 h-4 text-white" />
+                          </div>
                         )}
-                      >
-                        {message.type !== 'user' && message.type !== 'system' && message.agent && (
-                          <div className="text-xs text-gray-500 mb-1">{message.agent}</div>
+                        <div className="flex flex-col">
+                          <div
+                            className={cn(
+                              "p-4 rounded-2xl shadow-sm",
+                              message.type === 'user'
+                                ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white ml-auto'
+                                : message.type === 'system'
+                                ? 'bg-amber-50 text-amber-800 border border-amber-200 text-center'
+                                : 'bg-slate-50 text-slate-900 border border-slate-200'
+                            )}
+                          >
+                            {message.type !== 'user' && message.type !== 'system' && message.agent && (
+                              <div className="text-xs font-medium text-slate-500 mb-2">{message.agent}</div>
+                            )}
+                            <div className="text-sm leading-relaxed">{message.content}</div>
+                          </div>
+                          <div className={cn(
+                            "text-xs text-slate-400 mt-1.5 px-1",
+                            message.type === 'user' ? 'text-right' : 'text-left'
+                          )}>
+                            {message.timestamp}
+                          </div>
+                        </div>
+                        {message.type === 'user' && (
+                          <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                            <div className="text-xs font-medium text-slate-600">You</div>
+                          </div>
                         )}
-                        <div className="text-sm">{message.content}</div>
-                        <div className="text-xs text-gray-400 mt-1">{message.timestamp}</div>
                       </div>
                     </div>
                   ))
@@ -292,18 +364,31 @@ export function RealtimeAgents() {
               </CardContent>
 
               {/* Status Bar */}
-              <div className="p-4 border-t border-gray-200 bg-gray-50">
-                <div className="text-center">
-                  <div className="text-sm text-gray-600">
+              <div className="p-6 border-t border-slate-200/60 bg-gradient-to-r from-slate-50/50 to-blue-50/30">
+                <div className="flex items-center justify-center">
+                  <div className="flex items-center gap-3 px-4 py-2 bg-white/70 rounded-full border border-slate-200/60 shadow-sm">
                     {isConnected ? (
                       <>
-                        <span className="inline-flex items-center gap-1">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                          Voice conversation active - speak naturally
+                        <div className="flex gap-1">
+                          {[...Array(3)].map((_, i) => (
+                            <div
+                              key={i}
+                              className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"
+                              style={{ animationDelay: `${i * 0.2}s` }}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm font-medium text-slate-700">
+                          Voice conversation active
                         </span>
                       </>
                     ) : (
-                      <>Click "Connect" to start your voice conversation</>
+                      <>
+                        <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div>
+                        <span className="text-sm text-slate-600">
+                          Click "Start Conversation" to begin
+                        </span>
+                      </>
                     )}
                   </div>
                 </div>
