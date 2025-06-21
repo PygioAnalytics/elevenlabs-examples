@@ -21,33 +21,18 @@ export async function POST(request: NextRequest) {
       device_type: "Samsung Galaxy S24",
       device_value: 24000.00,
       monthly_instalment: 2000.00,
-      outstanding_payments: 6,
+      outstanding_payments: 8,
       payment_status: "30_days",
       bank_name: "Standard Bank",
       account_number: "155555555",
     };
 
-    // Format the response for the LLM
-    const responseText = `Customer Details Retrieved:
-Customer ID: ${customerData.id}
-Name: ${customerData.name}
-Loan Type: ${customerData.loan_type}
-Device: ${customerData.device_type}
-Device Value: R${customerData.device_value.toLocaleString()}
-Monthly Instalment: R${customerData.monthly_instalment}
-Outstanding Payments: ${customerData.outstanding_payments}
-Payment Status: ${customerData.payment_status} overdue
-Bank: ${customerData.bank_name}
-Account Number: ${customerData.account_number}
+    console.log('✅ Server tool returning customer data object:', customerData);
 
-This customer has ${customerData.outstanding_payments} outstanding payments and is ${customerData.payment_status} overdue.`;
-
-    console.log('✅ Server tool returning:', responseText);
-
-    // Return the response that the LLM will receive
+    // Return the structured customer data object for the client tool to use
     return NextResponse.json({
       success: true,
-      data: responseText
+      data: customerData
     });
 
   } catch (error) {

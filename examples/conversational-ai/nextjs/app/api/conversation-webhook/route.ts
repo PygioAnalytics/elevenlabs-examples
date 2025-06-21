@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { broadcastToSSE, closeSSEConnection } from '../conversation-stream/route';
+import { broadcastToSSE, closeSSEConnection } from '@/lib/sse-utils';
 
 // Store active conversations and their WebSocket connections
 const activeConversations = new Map<string, {
@@ -56,6 +56,18 @@ export async function POST(req: NextRequest) {
       case "conversation.agent_response":
       case "agent_response":
         handleAgentResponse(event);
+        break;
+      
+      case "conversation.tool_call":
+      case "tool_call":
+      case "function_call":
+        handleToolCall(event);
+        break;
+      
+      case "conversation.tool_result":
+      case "tool_result":
+      case "function_result":
+        handleToolResult(event);
         break;
       
       case "conversation.ended":
@@ -164,6 +176,61 @@ function handleAgentResponse(event: any) {
       type: 'agent_message',
       conversationId: conversation_id,
       message
+    });
+  }
+}
+
+// Tool call handler
+function handleToolCall(event: any) {
+  const conversation_id = event.conversation_id || event.conversationId;
+  console.log(`🔧 Tool call detected for conversation ${conversation_id}:`, event);
+  
+  if (conversation_id && activeConversations.has(conversation_id)) {
+    const conversation = activeConversations.get(conversation_id)!;
+    
+    // Extract tool call information
+    const toolCall = {
+      name: event.tool_name || event.function_name || event.name,
+      parameters: event.parameters || event.arguments || {},
+      id: event.tool_call_id || event.id
+    };
+    
+    console.log(`🔧 Broadcasting tool call: ${toolCall.name}`);
+    
+    // Broadcast tool call to frontend
+    broadcastToFrontend({
+      type: 'tool_call',
+      conversationId: conversation_id,
+      toolCall: toolCall,
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
+// Tool result handler
+function handleToolResult(event: any) {
+  const conversation_id = event.conversation_id || event.conversationId;
+  console.log(`✅ Tool result detected for conversation ${conversation_id}:`, event);
+  
+  if (conversation_id && activeConversations.has(conversation_id)) {
+    const conversation = activeConversations.get(conversation_id)!;
+    
+    // Extract tool result information
+    const toolResult = {
+      name: event.tool_name || event.function_name || event.name,
+      result: event.result || event.data || event.output,
+      success: event.success !== false, // Default to true unless explicitly false
+      id: event.tool_call_id || event.id
+    };
+    
+    console.log(`✅ Broadcasting tool result: ${toolResult.name}`);
+    
+    // Broadcast tool result to frontend
+    broadcastToFrontend({
+      type: 'tool_result',
+      conversationId: conversation_id,
+      toolResult: toolResult,
+      timestamp: new Date().toISOString()
     });
   }
 }
