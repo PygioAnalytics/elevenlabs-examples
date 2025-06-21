@@ -26,3 +26,9 @@ bun dev
 
 - [Conversational AI Quickstart](https://elevenlabs.io/docs/conversational-ai/quickstart)
 - [Conversational AI SDK](https://elevenlabs.io/docs/libraries/conversational-ai-sdk-js)
+
+# Terminal 1: Next.js server
+npm run dev
+
+# Terminal 2: ngrok tunnel (already running)
+ngrok http 3000

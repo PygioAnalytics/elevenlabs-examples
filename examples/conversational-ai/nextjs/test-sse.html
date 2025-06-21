@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test SSE Connection</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .event { background: #e8f5e8; padding: 8px; margin: 5px 0; border-left: 3px solid #4caf50; }
+        .error { background: #ffeaea; border-left: 3px solid #f44336; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .connected { background: #e8f5e8; color: #2e7d32; }
+        .disconnected { background: #ffeaea; color: #c62828; }
+        input, button { padding: 8px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 SSE Connection Test</h1>
+    
+    <div>
+        <label for="conversationId">Conversation ID:</label>
+        <input type="text" id="conversationId" placeholder="test_conv_123" value="test_conv_123">
+        <button onclick="connectSSE()">Connect to Stream</button>
+        <button onclick="disconnectSSE()">Disconnect</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+    </div>
+    
+    <div id="status" class="status disconnected">Disconnected</div>
+    
+    <h3>Event Log:</h3>
+    <div id="eventLog"></div>
+    
+    <script>
+        let eventSource = null;
+        
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('status');
+            if (connected) {
+                statusDiv.textContent = 'Connected';
+                statusDiv.className = 'status connected';
+            } else {
+                statusDiv.textContent = 'Disconnected';
+                statusDiv.className = 'status disconnected';
+            }
+        }
+        
+        function addLog(message, isError = false) {
+            const log = document.getElementById('eventLog');
+            const div = document.createElement('div');
+            div.className = isError ? 'event error' : 'event';
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function connectSSE() {
+            const conversationId = document.getElementById('conversationId').value;
+            if (!conversationId) {
+                addLog('Please enter a conversation ID', true);
+                return;
+            }
+            
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            addLog('🔗 Connecting to SSE stream...');
+            
+            eventSource = new EventSource(`/api/conversation-stream?conversationId=${conversationId}`);
+            
+            eventSource.onopen = function(event) {
+                addLog('✅ SSE connection opened');
+                updateStatus(true);
+            };
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    addLog(`📡 Received: <strong>${data.type}</strong> - ${JSON.stringify(data, null, 2)}`);
+                } catch (error) {
+                    addLog(`📡 Raw message: ${event.data}`);
+                }
+            };
+            
+            eventSource.onerror = function(event) {
+                addLog('❌ SSE connection error', true);
+                updateStatus(false);
+            };
+        }
+        
+        function disconnectSSE() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                addLog('🔌 Disconnected from SSE stream');
+                updateStatus(false);
+            }
+        }
+        
+        function clearLogs() {
+            document.getElementById('eventLog').innerHTML = '';
+        }
+        
+        // Auto-generate a test conversation ID
+        document.getElementById('conversationId').value = 'test_conv_' + Date.now();
+    </script>
+</body>
+</html>
