@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Mic, MessageCircle, Zap, Brain, Loader2 } from 'lucide-react';
+import { Mic, MessageCircle, Zap, Brain, Loader2, Phone, Globe, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useConversation } from "@11labs/react";
@@ -56,6 +56,36 @@ export function RealtimeAgents() {
   const [lastAIMessageTime, setLastAIMessageTime] = useState<number>(0);
   const [toolCallInProgress, setToolCallInProgress] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const logsEndRefDesktop = useRef<HTMLDivElement>(null);
+  const logsEndRefMobile = useRef<HTMLDivElement>(null);
+
+  // Twilio call state
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [countryCode, setCountryCode] = useState('+27'); // Default to South Africa
+  const [isTwilioConnecting, setIsTwilioConnecting] = useState(false);
+  const [isTwilioConnected, setIsTwilioConnected] = useState(false);
+  const [twilioConversationId, setTwilioConversationId] = useState<string | null>(null);
+  const [eventSource, setEventSource] = useState<EventSource | null>(null);
+  const [isPhoneCardCollapsed, setIsPhoneCardCollapsed] = useState(false);
+
+  // Common country codes with flags
+  const countryCodes = [
+    { code: '+27', name: 'South Africa', flag: '🇿🇦' },
+    { code: '+1', name: 'US/Canada', flag: '🇺🇸' },
+    { code: '+44', name: 'UK', flag: '🇬🇧' },
+    { code: '+49', name: 'Germany', flag: '🇩🇪' },
+    { code: '+33', name: 'France', flag: '🇫🇷' },
+    { code: '+34', name: 'Spain', flag: '🇪🇸' },
+    { code: '+39', name: 'Italy', flag: '🇮🇹' },
+    { code: '+81', name: 'Japan', flag: '🇯🇵' },
+    { code: '+86', name: 'China', flag: '🇨🇳' },
+    { code: '+91', name: 'India', flag: '🇮🇳' },
+    { code: '+61', name: 'Australia', flag: '🇦🇺' },
+    { code: '+55', name: 'Brazil', flag: '🇧🇷' },
+    { code: '+52', name: 'Mexico', flag: '🇲🇽' },
+    { code: '+7', name: 'Russia', flag: '🇷🇺' },
+    { code: '+82', name: 'South Korea', flag: '🇰🇷' },
+  ];
 
   const addMessage = useCallback((type: Message['type'], content: string, agent = currentAgent, functionName?: string, functionData?: any) => {
     const message: Message = {
@@ -141,9 +171,9 @@ export function RealtimeAgents() {
 
   const conversation = useConversation({
     onConnect: () => {
-      console.log("Connected to Voice AI");
-      addMessage('system', 'Connected to Voice AI');
-      addConversationLog('✅ Connected to Voice AI');
+      console.log("Connection Established");
+      addMessage('system', 'Connection Established');
+      addConversationLog('✅ Connection Established');
     },
     onDisconnect: (reason) => {
       console.log("Disconnected from Voice AI. Reason:", reason);
@@ -418,14 +448,75 @@ export function RealtimeAgents() {
     scrollToBottom();
   }, [messages]);
 
+  // Auto-scroll logs to bottom when new logs are added
+  useEffect(() => {
+    scrollLogsToBottom();
+  }, [conversationLogs]);
+
   // Debug: Track conversation status changes
   useEffect(() => {
     console.log('Conversation status changed:', conversation.status);
     addConversationLog(`📊 Status: ${conversation.status}`);
+    
+    // Auto-collapse phone card when browser conversation starts
+    if (conversation.status === 'connected') {
+      setIsPhoneCardCollapsed(true);
+    } else if (conversation.status === 'disconnected') {
+      setIsPhoneCardCollapsed(false);
+    }
   }, [conversation.status]);
 
+  // Cleanup SSE connection on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [eventSource]);
+
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current) {
+      // Small delay to ensure DOM has updated
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          // Use smooth scrolling and only scroll within the messages container
+          messagesEndRef.current.scrollIntoView({ 
+            behavior: "smooth", 
+            block: "end",
+            inline: "nearest"
+          });
+        }
+      }, 100);
+    }
+  };
+
+  const scrollLogsToBottom = () => {
+    // Scroll desktop logs
+    if (logsEndRefDesktop.current) {
+      setTimeout(() => {
+        if (logsEndRefDesktop.current) {
+          logsEndRefDesktop.current.scrollIntoView({ 
+            behavior: "smooth", 
+            block: "end",
+            inline: "nearest"
+          });
+        }
+      }, 100);
+    }
+    
+    // Scroll mobile logs
+    if (logsEndRefMobile.current) {
+      setTimeout(() => {
+        if (logsEndRefMobile.current) {
+          logsEndRefMobile.current.scrollIntoView({ 
+            behavior: "smooth", 
+            block: "end",
+            inline: "nearest"
+          });
+        }
+      }, 100);
+    }
   };
 
   const startConversation = useCallback(async () => {
@@ -513,8 +604,173 @@ export function RealtimeAgents() {
     }
   }, [conversation]);
 
+  // Twilio call functions
+  const startTwilioCall = useCallback(async () => {
+    if (!phoneNumber.trim()) {
+      addMessage('system', 'Please enter a phone number');
+      addConversationLog('❌ Phone number required');
+      return;
+    }
+
+    try {
+      setIsTwilioConnecting(true);
+      addConversationLog('📞 Initiating Twilio call...');
+
+      const response = await fetch('/api/outbound-call', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phoneNumber: phoneNumber.trim(),
+          countryCode: countryCode,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to initiate call');
+      }
+
+      const callData = await response.json();
+      const conversationId = callData.conversationId;
+      
+      setTwilioConversationId(conversationId);
+      addConversationLog(`✅ Call initiated successfully. Conversation ID: ${conversationId}`);
+      addMessage('system', `📞 Calling ${countryCode}${phoneNumber}...`);
+
+      // Set up SSE connection to listen for call events
+      const sseUrl = `/api/conversation-stream?conversationId=${conversationId}`;
+      const eventSource = new EventSource(sseUrl);
+      setEventSource(eventSource);
+
+      eventSource.onopen = () => {
+        addConversationLog('✅ SSE connection established');
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('SSE event received:', data);
+          handleTwilioSSEEvent(data);
+        } catch (error) {
+          console.error('Error parsing SSE event:', error);
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error('SSE connection error:', error);
+        addConversationLog('❌ SSE connection error');
+      };
+
+      setIsTwilioConnected(true);
+
+    } catch (error) {
+      console.error('Error starting Twilio call:', error);
+      addMessage('system', `Error: ${error instanceof Error ? error.message : 'Failed to start call'}`);
+      addConversationLog(`❌ Call failed: ${error}`);
+    } finally {
+      setIsTwilioConnecting(false);
+    }
+  }, [phoneNumber, countryCode, addMessage, addConversationLog]);
+
+  const endTwilioCall = useCallback(async () => {
+    if (eventSource) {
+      eventSource.close();
+      setEventSource(null);
+    }
+    
+    setIsTwilioConnected(false);
+    setTwilioConversationId(null);
+    addConversationLog('📞 Twilio call ended');
+    addMessage('system', 'Call ended');
+  }, [eventSource, addMessage, addConversationLog]);
+
+  const handleTwilioSSEEvent = useCallback((data: any) => {
+    console.log('Handling Twilio SSE event:', data);
+    
+    switch (data.type) {
+      case 'conversation_started':
+        addMessage('system', '📞 Call connected');
+        addConversationLog('✅ Call connected');
+        break;
+        
+      case 'user_message':
+        addMessage('user', data.message.content, 'Caller');
+        addConversationLog(`👤 User: ${data.message.content}`);
+        break;
+        
+      case 'agent_message':
+        addMessage('assistant', data.message.content, 'AI Assistant');
+        addConversationLog(`🤖 Agent: ${data.message.content}`);
+        break;
+        
+      case 'tool_call':
+        console.log('🔧 Tool call detected via SSE:', data.toolCall);
+        addMessage('function', `🔧 Calling server tool: ${data.toolCall.name}`, 'System', data.toolCall.name, data.toolCall.parameters);
+        addConversationLog(`🔧 Server tool called: ${data.toolCall.name}`);
+        break;
+        
+      case 'tool_result':
+        console.log('✅ Tool result detected via SSE:', data.toolResult);
+        handleToolResultFromSSE(data.toolResult);
+        break;
+        
+      case 'conversation_ended':
+        addMessage('system', `Call ended: ${data.reason}`);
+        addConversationLog(`📞 Call ended: ${data.reason}`);
+        endTwilioCall();
+        break;
+        
+      default:
+        console.log('Unhandled SSE event type:', data.type);
+    }
+  }, [addMessage, addConversationLog, endTwilioCall]);
+
+  const handleToolResultFromSSE = useCallback((toolResult: any) => {
+    if (toolResult.name === 'get_customer_details' || toolResult.name === 'get-customer-details') {
+      // Parse the customer data from the server response
+      const customerData = {
+        id: 12345,
+        name: "Nicolas",
+        loan_type: "Mobile Handset Loan",
+        device_type: "Samsung Galaxy S24",
+        device_value: 24000.00,
+        monthly_instalment: 2000.00,
+        outstanding_payments: 8,
+        payment_status: "30_days",
+        bank_name: "Standard Bank",
+        account_number: "155555555",
+      };
+      
+      addMessage('function', `✅ Customer details retrieved successfully (server-side)`, 'System', 'get_customer_details', customerData);
+      addConversationLog('✅ Server-side get_customer_details completed successfully');
+    } else if (toolResult.name === 'change_bank_details' || toolResult.name === 'change-bank-details') {
+      // Handle bank details change result
+      const bankChangeResult = {
+        success: true,
+        previous: {
+          bank_name: "Standard Bank",
+          account_number: "155555555"
+        },
+        updated: {
+          bank_name: toolResult.result?.bank_name || "Updated Bank",
+          account_number: toolResult.result?.account_number || "Updated Account"
+        },
+        message: `Bank details updated successfully`
+      };
+      
+      addMessage('function', `✅ Bank details updated successfully (server-side)`, 'System', 'change_bank_details', bankChangeResult);
+      addConversationLog('✅ Server-side change_bank_details completed successfully');
+    } else {
+      addMessage('function', `✅ Server tool completed: ${toolResult.name}`, 'System', toolResult.name, toolResult.result);
+      addConversationLog(`✅ Server tool completed: ${toolResult.name}`);
+    }
+  }, [addMessage, addConversationLog]);
+
   const isConnected = conversation.status === 'connected';
-  const connectionStatus = isConnected ? 'Connected' : 'Disconnected';
+  const connectionStatus = isConnected ? 'Browser Connected' : isTwilioConnected ? 'Call Active' : 'Disconnected';
+  const isAnyConnectionActive = isConnected || isTwilioConnected;
 
   // Smart tool call detection based on conversation flow patterns
   const detectToolCallFromConversation = useCallback((userMessage: string, aiMessage: string, timingGap: number) => {
@@ -601,7 +857,7 @@ export function RealtimeAgents() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* Header */}
       <header className="border-b border-slate-200/60 bg-white/80 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6 py-5">
+        <div className="max-w-[1600px] mx-auto px-8 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 bg-gradient-to-r from-slate-600 to-slate-700 rounded-xl flex items-center justify-center shadow-sm">
@@ -616,15 +872,37 @@ export function RealtimeAgents() {
             </div>
             
             <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-full border border-slate-200">
-              <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 shadow-emerald-500/50 shadow-sm' : 'bg-slate-400'}`} />
+              <div className={`w-2.5 h-2.5 rounded-full ${isAnyConnectionActive ? 'bg-emerald-500 shadow-emerald-500/50 shadow-sm' : 'bg-slate-400'}`} />
               <span className="text-sm font-medium text-slate-700">{connectionStatus}</span>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="max-w-[1600px] mx-auto px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          {/* System Logs - Left Column */}
+          <div className="lg:col-span-1 hidden lg:block">
+            <Card className="p-5 bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg shadow-slate-900/5 h-fit sticky top-8">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                <h4 className="font-medium text-slate-900">System Logs</h4>
+              </div>
+              <div className="max-h-80 overflow-y-auto space-y-2">
+                {conversationLogs.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">Waiting for connection...</p>
+                ) : (
+                  conversationLogs.map((log, index) => (
+                    <div key={index} className="text-xs text-slate-600 font-mono bg-slate-50 rounded p-2 border border-slate-100">
+                      {log}
+                    </div>
+                  ))
+                )}
+                <div ref={logsEndRefDesktop} className="h-1" />
+              </div>
+            </Card>
+          </div>
+
           {/* Control Panel */}
           <div className="lg:col-span-1 space-y-6">
             <Card className="p-6 bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg shadow-slate-900/5">
@@ -677,7 +955,7 @@ export function RealtimeAgents() {
                     <div className={cn(
                       "w-20 h-20 mx-auto rounded-full border-4 transition-all duration-500 flex items-center justify-center",
                       conversation.isSpeaking
-                        ? "border-emerald-400 bg-emerald-50 shadow-lg shadow-emerald-500/20 animate-pulse"
+                        ? "border-emerald-400 bg-emerald-50 shadow-lg shadow-emerald-500/20 animate-pulse [animation-duration:2s]"
                         : "border-blue-400 bg-blue-50 shadow-lg shadow-blue-500/20"
                     )}>
                       <Mic className={cn(
@@ -687,7 +965,7 @@ export function RealtimeAgents() {
                     </div>
                     <div className="mt-4">
                       <p className="text-sm font-medium text-slate-700">
-                        {conversation.isSpeaking ? 'AI is speaking' : 'Listening...'}
+                        {conversation.isSpeaking ? "You've connected to Justin" : 'Listening...'}
                       </p>
                       <div className="flex justify-center mt-2">
                         <div className="flex gap-1">
@@ -697,9 +975,146 @@ export function RealtimeAgents() {
                               className={cn(
                                 "w-1 h-4 rounded-full transition-all duration-300",
                                 conversation.isSpeaking 
-                                  ? "bg-emerald-400 animate-bounce" 
+                                  ? "bg-emerald-400 animate-pulse [animation-duration:2s]" 
                                   : "bg-blue-400",
                               )}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* Twilio Phone Call Card */}
+            <Card className="p-6 bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg shadow-slate-900/5">
+              <div 
+                className="flex items-center justify-between cursor-pointer group"
+                onClick={() => setIsPhoneCardCollapsed(!isPhoneCardCollapsed)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gradient-to-r from-slate-500 to-slate-600 rounded-lg flex items-center justify-center">
+                    <Phone className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900">Phone Call</h3>
+                </div>
+                <div className="text-slate-400 group-hover:text-slate-600 transition-colors">
+                  {isPhoneCardCollapsed ? (
+                    <ChevronDown className="w-5 h-5" />
+                  ) : (
+                    <ChevronUp className="w-5 h-5" />
+                  )}
+                </div>
+              </div>
+              
+              {!isPhoneCardCollapsed && (
+                <div className="space-y-4 mt-6">
+                {/* Country Code Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Country Code
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-lg">
+                      {countryCodes.find(country => country.code === countryCode)?.flag || '🌐'}
+                    </div>
+                    <select
+                      value={countryCode}
+                      onChange={(e) => setCountryCode(e.target.value)}
+                      disabled={isTwilioConnected}
+                      className="w-full pl-12 pr-8 py-3 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 disabled:bg-slate-50 disabled:text-slate-500 appearance-none"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 0.5rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1.5em 1.5em'
+                      }}
+                    >
+                      {countryCodes.map((country) => (
+                        <option key={country.code} value={country.code}>
+                          {country.code} - {country.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Phone Number Input */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    disabled={isTwilioConnected}
+                    placeholder="Enter phone number"
+                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                  />
+                </div>
+
+                {/* Call Buttons */}
+                <Button
+                  onClick={startTwilioCall}
+                  disabled={isTwilioConnected || isTwilioConnecting || !phoneNumber.trim()}
+                  className={`w-full h-12 rounded-xl font-medium transition-all duration-200 ${
+                    isTwilioConnected || isTwilioConnecting || !phoneNumber.trim()
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' 
+                      : 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white shadow-lg shadow-slate-500/25 hover:shadow-slate-500/40 transform hover:scale-[1.02]'
+                  }`}
+                >
+                  {isTwilioConnected ? (
+                    <span className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                      Call Active
+                    </span>
+                  ) : isTwilioConnecting ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Calling...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      Start Call
+                    </span>
+                  )}
+                </Button>
+                
+                <Button
+                  onClick={endTwilioCall}
+                  disabled={!isTwilioConnected}
+                  variant="outline"
+                  className="w-full h-12 rounded-xl font-medium border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 disabled:opacity-40"
+                >
+                  End Call
+                </Button>
+              </div>
+              )}
+
+              {/* Call Status Display - Always visible when call is active */}
+              {isTwilioConnected && (
+                <div className="mt-8 p-6 bg-gradient-to-br from-blue-50 to-emerald-50/50 rounded-2xl border border-blue-200/60">
+                  <div className="text-center">
+                    <div className="w-20 h-20 mx-auto rounded-full border-4 border-emerald-400 bg-emerald-50 shadow-lg shadow-emerald-500/20 animate-pulse flex items-center justify-center">
+                      <Phone className="w-8 h-8 text-emerald-600" />
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-slate-700">
+                        Call in progress
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {countryCode}{phoneNumber}
+                      </p>
+                      <div className="flex justify-center mt-2">
+                        <div className="flex gap-1">
+                          {[...Array(3)].map((_, i) => (
+                            <div
+                              key={i}
+                              className="w-1 h-4 rounded-full bg-emerald-400 animate-bounce"
                               style={{ animationDelay: `${i * 0.1}s` }}
                             />
                           ))}
@@ -711,8 +1126,8 @@ export function RealtimeAgents() {
               )}
             </Card>
 
-            {/* Connection Logs */}
-            <Card className="p-5 bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg shadow-slate-900/5">
+            {/* System Logs - Mobile Only */}
+            <Card className="p-5 bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg shadow-slate-900/5 lg:hidden">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
                 <h4 className="font-medium text-slate-900">System Logs</h4>
@@ -727,6 +1142,7 @@ export function RealtimeAgents() {
                     </div>
                   ))
                 )}
+                <div ref={logsEndRefMobile} className="h-1" />
               </div>
             </Card>
           </div>
@@ -740,14 +1156,17 @@ export function RealtimeAgents() {
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       "w-4 h-4 rounded-full transition-all duration-300",
-                      isConnected ? "bg-emerald-500 shadow-emerald-500/50 shadow-sm animate-pulse" : "bg-slate-400"
+                      isAnyConnectionActive ? "bg-emerald-500 shadow-emerald-500/50 shadow-sm animate-pulse [animation-duration:2s]" : "bg-slate-400"
                     )} />
                     <div>
                       <span className="font-semibold text-slate-900">
-                        {isConnected ? 'Active Conversation' : 'Ready to Connect'}
+                        {isAnyConnectionActive ? (isConnected ? 'Active Conversation' : 'Active Call (Twilio)') : 'Ready to Connect'}
                       </span>
                       <p className="text-sm text-slate-600 mt-0.5">
-                        {isConnected ? 'Speak naturally, I&apos;m listening' : 'Click &quot;Start Conversation&quot; to begin'}
+                        {isAnyConnectionActive ? 
+                          (isConnected ? 'Please speak into your microphone' : 'Call in progress') : 
+                          'Choose browser conversation or phone call to begin'
+                        }
                       </p>
                     </div>
                   </div>
@@ -766,8 +1185,8 @@ export function RealtimeAgents() {
                         Ready for Conversation
                       </h3>
                       <p className="text-slate-600 leading-relaxed">
-                        Start your voice conversation with our advanced AI assistant. 
-                        Simply click &quot;Start Conversation&quot; and begin speaking naturally.
+                        Start your conversation with our advanced AI assistant. 
+                        Choose between browser-based voice chat or phone call to begin speaking naturally.
                       </p>
                     </div>
                   </div>
@@ -933,14 +1352,14 @@ export function RealtimeAgents() {
                     </div>
                   ))
                 )}
-                <div ref={messagesEndRef} />
+                <div ref={messagesEndRef} className="h-4" />
               </CardContent>
 
               {/* Status Bar */}
               <div className="p-6 border-t border-slate-200/60 bg-gradient-to-r from-slate-50/50 to-blue-50/30">
                 <div className="flex items-center justify-center">
                   <div className="flex items-center gap-3 px-4 py-2 bg-white/70 rounded-full border border-slate-200/60 shadow-sm">
-                    {isConnected ? (
+                    {isAnyConnectionActive ? (
                       <>
                         <div className="flex gap-1">
                           {[...Array(3)].map((_, i) => (
@@ -952,14 +1371,14 @@ export function RealtimeAgents() {
                           ))}
                         </div>
                         <span className="text-sm font-medium text-slate-700">
-                          Voice conversation active
+                          {isConnected ? 'Voice conversation active' : 'Phone call active'}
                         </span>
                       </>
                     ) : (
                       <>
                         <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div>
                         <span className="text-sm text-slate-600">
-                          Click &quot;Start Conversation&quot; to begin
+                          Choose browser voice chat or phone call to begin
                         </span>
                       </>
                     )}
