@@ -3,7 +3,7 @@ import "./globals.css";
 import {BackgroundWave} from "@/components/background-wave";
 
 export const metadata: Metadata = {
-    title: "ConvAI",
+    title: "Agent Flow",
 };
 
 export default function RootLayout({children}: Readonly<{ children: React.ReactNode }>) {

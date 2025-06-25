@@ -179,8 +179,7 @@ export function RealtimeAgents() {
       console.log("Disconnected from Voice AI. Reason:", reason);
       addMessage('system', `Disconnected from Voice AI${reason ? `: ${reason}` : ''}`);
       addConversationLog(`❌ Disconnected from Voice AI${reason ? `: ${reason}` : ''}`);
-      setMessages([]);
-      setConversationLogs([]);
+      // Don't clear messages here - let them persist until next conversation starts
       setCurrentAgent('AI Assistant');
     },
     onError: (error: any) => {
@@ -521,6 +520,11 @@ export function RealtimeAgents() {
 
   const startConversation = useCallback(async () => {
     console.log('Starting conversation...');
+    
+    // Clear previous messages when starting a new conversation
+    setMessages([]);
+    setConversationLogs([]);
+    
     addConversationLog('🔄 Starting conversation process...');
     
     // Check browser compatibility
@@ -591,7 +595,7 @@ export function RealtimeAgents() {
     } finally {
       setIsConnecting(false);
     }
-  }, [conversation, addMessage, addConversationLog]);
+  }, [conversation, addMessage, addConversationLog, setMessages, setConversationLogs]);
 
   const stopConversation = useCallback(async () => {
     try {
@@ -614,6 +618,11 @@ export function RealtimeAgents() {
 
     try {
       setIsTwilioConnecting(true);
+      
+      // Clear previous messages when starting a new phone call
+      setMessages([]);
+      setConversationLogs([]);
+      
       addConversationLog('📞 Initiating Twilio call...');
 
       const response = await fetch('/api/outbound-call', {
@@ -672,7 +681,7 @@ export function RealtimeAgents() {
     } finally {
       setIsTwilioConnecting(false);
     }
-  }, [phoneNumber, countryCode, addMessage, addConversationLog]);
+  }, [phoneNumber, countryCode, addMessage, addConversationLog, setMessages, setConversationLogs]);
 
   const endTwilioCall = useCallback(async () => {
     if (eventSource) {

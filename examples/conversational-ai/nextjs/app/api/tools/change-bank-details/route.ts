@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     
     // For demo purposes, simulate the update
     const previousBankName = "Standard Bank";
-    const previousAccountNumber = "155555555";
+    const previousAccountNumber = "673845";
 
     // Format the response for the LLM
     const responseText = `Bank Details Successfully Updated:

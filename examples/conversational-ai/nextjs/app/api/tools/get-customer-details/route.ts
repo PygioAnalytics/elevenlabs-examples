@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       outstanding_payments: 8,
       payment_status: "30_days",
       bank_name: "Standard Bank",
-      account_number: "155555555",
+      account_number: "673845",
     };
 
     console.log('✅ Server tool returning customer data object:', customerData);
