@@ -177,8 +177,8 @@ export function RealtimeAgents() {
     },
     onDisconnect: (reason) => {
       console.log("Disconnected from Voice AI. Reason:", reason);
-      addMessage('system', `Disconnected from Voice AI${reason ? `: ${reason}` : ''}`);
-      addConversationLog(`❌ Disconnected from Voice AI${reason ? `: ${reason}` : ''}`);
+      addMessage('system', `Chat Disconnected`);
+      addConversationLog(`❌ Disconnected from AI`);
       // Don't clear messages here - let them persist until next conversation starts
       setCurrentAgent('AI Assistant');
     },

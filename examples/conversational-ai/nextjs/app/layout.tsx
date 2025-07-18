@@ -3,7 +3,7 @@ import "./globals.css";
 import {BackgroundWave} from "@/components/background-wave";
 
 export const metadata: Metadata = {
-    title: "Agent Flow",
+    title: "Pygio Collections",
 };
 
 export default function RootLayout({children}: Readonly<{ children: React.ReactNode }>) {
